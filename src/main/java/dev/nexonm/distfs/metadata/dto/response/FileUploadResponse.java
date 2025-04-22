@@ -7,10 +7,10 @@ import lombok.Data;
 @Data
 public class FileUploadResponse {
 
-    String newFileName;
+    String fileUUID;
     String originalFileName;
-    String downloadUri;
     String fileType;
     String fileSize;
+    String chunkNumber;
 
 }

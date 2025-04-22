@@ -1,8 +1,6 @@
 package dev.nexonm.distfs.metadata.controller;
 
-import dev.nexonm.distfs.metadata.dto.response.ChunkResponse;
-import dev.nexonm.distfs.metadata.dto.response.FileChunkedResponse;
-import dev.nexonm.distfs.metadata.dto.FileMapper;
+import dev.nexonm.distfs.metadata.dto.response.FileUploadResponse;
 import dev.nexonm.distfs.metadata.service.FileStorageService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,8 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequestMapping(path = "/api/files")
@@ -32,12 +28,10 @@ public class FileStoreController {
 //    }
 
     @PostMapping("/uploadChunked")
-    public ResponseEntity<FileChunkedResponse> uploadFileChunked(
+    public ResponseEntity<FileUploadResponse> uploadFileChunked(
             @RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue = "50") int chunkSize) {
 
-        List<ChunkResponse> chunks = fileStorageService.storeFileChunked(file, chunkSize);
-
-        return ResponseEntity.ok(FileMapper.mapFileToFileChunkedResponse(file, chunks, chunkSize));
+        return ResponseEntity.ok(fileStorageService.storeFileChunked(file, chunkSize));
     }
 }

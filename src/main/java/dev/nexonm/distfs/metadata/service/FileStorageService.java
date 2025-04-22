@@ -2,7 +2,10 @@ package dev.nexonm.distfs.metadata.service;
 
 
 import dev.nexonm.distfs.metadata.config.FileStorageProperties;
+import dev.nexonm.distfs.metadata.dto.FileMapper;
 import dev.nexonm.distfs.metadata.dto.response.ChunkResponse;
+import dev.nexonm.distfs.metadata.dto.response.FileDownloadResponse;
+import dev.nexonm.distfs.metadata.dto.response.FileUploadResponse;
 import dev.nexonm.distfs.metadata.entity.ChunkProperties;
 import dev.nexonm.distfs.metadata.entity.FileProperties;
 import dev.nexonm.distfs.metadata.entity.StorageNode;
@@ -64,7 +67,7 @@ public class FileStorageService {
         }
     }
 
-    public List<ChunkResponse> storeFileChunked(MultipartFile file, int chunkSizeBytes) {
+    public FileUploadResponse storeFileChunked(MultipartFile file, int chunkSizeBytes) {
         /** The flow of the file storage process is as follows:
          * 1. Get file
          * 2. Divide into chunks
@@ -90,7 +93,9 @@ public class FileStorageService {
         // 3+4. Create distribution
         List<DistributionResult> distribution = new ArrayList<>(distributeChunksWithReplication(chunks.size()));
         // 5. Send data to nodes
-        return sendDataToAllNodes(distribution, chunks);
+        sendDataToAllNodes(distribution, chunks);
+        // return file data to client
+        return FileMapper.mapFiletoFileUploadResponse(file, chunks.size(), fileProperties.getId().toString());
     }
 
     private List<ChunkDivisionResult> divideIntoChunks(FileProperties fileProperties, MultipartFile file,
