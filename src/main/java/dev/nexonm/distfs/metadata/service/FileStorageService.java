@@ -47,13 +47,14 @@ public class FileStorageService {
     private final FilePropertiesRepository filePropertiesRepository;
     private final WebClient webClient;
     private final ChunkSizeCalculator chunkSizeCalculator;
+    private final NodeHealthRegistry nodeHealthRegistry;
 
     private int replicationFactor;
 
     public FileStorageService(FileStorageProperties properties, StorageNodeRepository storageNodeRepository,
                               ChunkPropertiesRepository chunkPropertiesRepository,
                               FilePropertiesRepository filePropertiesRepository, WebClient webClient,
-                              ChunkSizeCalculator chunkSizeCalculator) {
+                              ChunkSizeCalculator chunkSizeCalculator, NodeHealthRegistry nodeHealthRegistry) {
         Path fileStorageLocation = Paths.get(properties.getUploadDir()).toAbsolutePath().normalize();
         this.storageNodeRepository = storageNodeRepository;
         this.chunkPropertiesRepository = chunkPropertiesRepository;
@@ -61,7 +62,9 @@ public class FileStorageService {
         this.webClient = webClient;
         this.replicationFactor = 2; // Set default replication factor
         this.chunkSizeCalculator = chunkSizeCalculator;
+        this.nodeHealthRegistry = nodeHealthRegistry;
 
+        //TODO: delete rhe fileStorageLocation.
         try {
             Files.createDirectories(fileStorageLocation);
         } catch (Exception ex) {
@@ -141,10 +144,12 @@ public class FileStorageService {
 
     private List<DistributionResult> distributeChunksWithReplication(int chunksNumber) {
         // Round Robin implementation
-        List<StorageNode> storageNodesList = new ArrayList<>(storageNodeRepository.findAll());
+        List<StorageNode> storageNodesList = storageNodeRepository.findAll().stream()
+                .filter(node -> nodeHealthRegistry.isNodeHealthy(node.getId())).toList();
+        // TODO: check if there is only one node available
         List<DistributionResult> results = new LinkedList<>();
         int nodeIndex = 0;
-        for (int chunkIndex = 0; chunkIndex< chunksNumber; chunkIndex++) {
+        for (int chunkIndex = 0; chunkIndex < chunksNumber; chunkIndex++) {
             for (int i = 0; i < replicationFactor; i++) {
                 if (nodeIndex >= storageNodesList.size()) {
                     nodeIndex = 0;
