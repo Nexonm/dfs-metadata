@@ -13,8 +13,8 @@ public class FileMapper {
                 .fileUUID(fileUUID)
                 .originalFileName(file.getOriginalFilename())
                 .fileType(file.getContentType())
-                .fileSize(String.format("%d bytes", file.getSize()))
-                .chunkNumber(String.format("%d bytes", chunkNumber))
+                .fileSizeBytes(file.getSize())
+                .chunkNumber(chunkNumber)
                 .build();
 
     }

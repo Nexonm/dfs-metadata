@@ -10,7 +10,7 @@ public class FileUploadResponse {
     String fileUUID;
     String originalFileName;
     String fileType;
-    String fileSize;
-    String chunkNumber;
+    Long fileSizeBytes;
+    Long chunkNumber;
 
 }
