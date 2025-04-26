@@ -46,18 +46,21 @@ public class FileStorageService {
     private final ChunkPropertiesRepository chunkPropertiesRepository;
     private final FilePropertiesRepository filePropertiesRepository;
     private final WebClient webClient;
+    private final ChunkSizeCalculator chunkSizeCalculator;
 
     private int replicationFactor;
 
     public FileStorageService(FileStorageProperties properties, StorageNodeRepository storageNodeRepository,
                               ChunkPropertiesRepository chunkPropertiesRepository,
-                              FilePropertiesRepository filePropertiesRepository, WebClient webClient) {
+                              FilePropertiesRepository filePropertiesRepository, WebClient webClient,
+                              ChunkSizeCalculator chunkSizeCalculator) {
         Path fileStorageLocation = Paths.get(properties.getUploadDir()).toAbsolutePath().normalize();
         this.storageNodeRepository = storageNodeRepository;
         this.chunkPropertiesRepository = chunkPropertiesRepository;
         this.filePropertiesRepository = filePropertiesRepository;
         this.webClient = webClient;
         this.replicationFactor = 2; // Set default replication factor
+        this.chunkSizeCalculator = chunkSizeCalculator;
 
         try {
             Files.createDirectories(fileStorageLocation);
@@ -86,7 +89,7 @@ public class FileStorageService {
                 .totalSize(file.getSize())
                 .build();
         // 2. Divide into chunks
-        List<ChunkDivisionResult> chunks = divideIntoChunks(fileProperties, file, chunkSizeBytes);
+        List<ChunkDivisionResult> chunks = divideIntoChunks(fileProperties, file);
         // Add database persistence for file properties and chunks
         filePropertiesRepository.save(fileProperties);
         chunkPropertiesRepository.saveAll(fileProperties.getChunks());
@@ -98,9 +101,10 @@ public class FileStorageService {
         return FileMapper.mapFiletoFileUploadResponse(file, chunks.size(), fileProperties.getId().toString());
     }
 
-    private List<ChunkDivisionResult> divideIntoChunks(FileProperties fileProperties, MultipartFile file,
-                                                       int chunkSizeBytes) {
+    private List<ChunkDivisionResult> divideIntoChunks(FileProperties fileProperties, MultipartFile file) {
         List<ChunkDivisionResult> results = new LinkedList<>();
+
+        int chunkSizeBytes = chunkSizeCalculator.calculateOptimalChunkSize(file.getSize());
 
         try (InputStream inputStream = file.getInputStream()) {
             byte[] buffer = new byte[chunkSizeBytes];
