@@ -65,4 +65,5 @@ public class ChunkProperties {
         storageNodes.remove(node);
         node.getChunks().remove(this);
     }
+
 }

@@ -13,6 +13,9 @@ import dev.nexonm.distfs.metadata.exception.StorageNodeException;
 import dev.nexonm.distfs.metadata.repository.ChunkPropertiesRepository;
 import dev.nexonm.distfs.metadata.repository.FilePropertiesRepository;
 import dev.nexonm.distfs.metadata.repository.StorageNodeRepository;
+import dev.nexonm.distfs.metadata.service.model.ChunkDivisionResult;
+import dev.nexonm.distfs.metadata.service.model.ChunkSendResult;
+import dev.nexonm.distfs.metadata.service.model.DistributionResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
@@ -31,8 +34,11 @@ import java.io.InputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -46,6 +52,7 @@ public class FileStorageService {
     private final ChunkSizeCalculator chunkSizeCalculator;
     private final NodeHealthRegistry nodeHealthRegistry;
     private final ReplicationFactorCalculator replicationFactorCalculator;
+    private final ParallelChunkSender parallelChunkSender;
 
 
     public FileUploadResponse storeFileChunked(MultipartFile file, int chunkSizeBytes) {
@@ -67,20 +74,22 @@ public class FileStorageService {
                 .totalSize(file.getSize())
                 .build();
         // 2. Divide into chunks
-        List<ChunkDivisionResult> chunks = divideIntoChunks(fileProperties, file);
+        Map<Integer, ChunkDivisionResult> chunks = divideIntoChunks(fileProperties, file);
         // Add database persistence for file properties and chunks
         filePropertiesRepository.save(fileProperties);
         chunkPropertiesRepository.saveAll(fileProperties.getChunks());
         // 3+4. Create distribution
         List<DistributionResult> distribution = new ArrayList<>(distributeChunksWithReplication(chunks.size()));
         // 5. Send data to nodes
-        sendDataToAllNodes(distribution, chunks);
+        List<ChunkSendResult> sendResults = parallelChunkSender.sendAllChunks(chunks, distribution);
+        // persist chunk data with nodes
+        persistChunksInDB(sendResults);
         // return file data to client
         return FileMapper.mapFiletoFileUploadResponse(file, chunks.size(), fileProperties.getId().toString());
     }
 
-    private List<ChunkDivisionResult> divideIntoChunks(FileProperties fileProperties, MultipartFile file) {
-        List<ChunkDivisionResult> results = new LinkedList<>();
+    private Map<Integer, ChunkDivisionResult> divideIntoChunks(FileProperties fileProperties, MultipartFile file) {
+        Map<Integer, ChunkDivisionResult> results = new HashMap<>();
 
         int chunkSizeBytes = chunkSizeCalculator.calculateOptimalChunkSize(file.getSize());
 
@@ -101,7 +110,7 @@ public class FileStorageService {
                                 .id(UUID.randomUUID())
                                 .build();
                 // Add to list
-                results.add(new ChunkDivisionResult(chunkProperty, chunkContent));
+                results.put(chunkNumber, new ChunkDivisionResult(chunkProperty, chunkContent));
                 // Add chunk to FileProperties
                 fileProperties.addChunk(chunkProperty);
                 // Increase counter
@@ -133,7 +142,7 @@ public class FileStorageService {
                 if (nodeIndex >= storageNodesList.size()) {
                     nodeIndex = 0;
                 }
-                results.add(new DistributionResult(storageNodesList.get(nodeIndex), chunkIndex));
+                results.add(new DistributionResult(storageNodesList.get(nodeIndex), chunkIndex+1));
                 nodeIndex++;
             }
         }
@@ -141,78 +150,15 @@ public class FileStorageService {
         return results;
     }
 
-    private List<ChunkResponse> sendDataToAllNodes(List<DistributionResult> distribution,
-                                                   List<ChunkDivisionResult> chunks) {
-        List<ChunkResponse> chunkResponses = new ArrayList<>(distribution.size());
-        for (int i = 0; i < distribution.size(); i++) {
-            StorageNode node = distribution.get(i).storageNode();
-            int index = distribution.get(i).chunkIndex();
-            ChunkProperties chunkProperties = chunks.get(index).chunkProperties();
-            if (sendDataToSingleNode(node, chunks.get(index).chunkData(), chunkProperties)) {
-                chunkProperties.addStorageNode(node);
-                // Update the chunk in database to record successful storage
-                chunkPropertiesRepository.save(chunkProperties);
-
-                chunkResponses.add(ChunkResponse.builder().chunkFileName(
-                                String.format("%s_%s_chunk%d", chunkProperties.getFile().getId().toString(),
-                                        chunkProperties.getId().toString(), chunkProperties.getChunkIndex()))
-                        .host(String.format("http://%s:%d/api/chunk/upload", node.getHostAddr(), node.getPort()))
-                        .chunkFileSizeBytes(chunkProperties.getChunkSize())
-                        .build());
-            } else {
-                i--;
+    private void persistChunksInDB(List<ChunkSendResult> results){
+        HashSet<ChunkProperties> chunkSet = new HashSet<>();
+        results.forEach(result -> {
+            if (result.result()){
+                result.chunkProperties().addStorageNode(result.storageNode());
             }
-        }
-        return chunkResponses;
-    }
-
-    private boolean sendDataToSingleNode(StorageNode node, byte[] data, ChunkProperties chunk) {
-        String url = String.format("http://%s:%d/api/chunk/upload", node.getHostAddr(), node.getPort());
-        log.info("Sending chunk {} to {}", chunk.getId(), url);
-
-        try {
-            ByteArrayResource resource = new ByteArrayResource(data) {
-                @Override
-                public String getFilename() {
-                    return chunk.getId().toString();
-                }
-            };
-
-            // Create multipart body builder and add all parts
-            MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
-            bodyBuilder.part("file", resource);
-            bodyBuilder.part("chunkId", chunk.getId().toString());
-            bodyBuilder.part("fileId", chunk.getFile().getId().toString());
-            bodyBuilder.part("chunkIndex", chunk.getChunkIndex().toString());
-
-            Boolean result = webClient.post().uri(url).contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(BodyInserters.fromMultipartData(bodyBuilder.build())).retrieve()
-                    .onStatus(HttpStatusCode::isError, response -> {
-                        log.error("Failed to send chunk {} to node {}:{}, Status: {}", chunk.getId(),
-                                node.getHostAddr(), node.getPort(), response.statusCode());
-                        return Mono.error(
-                                new StorageNodeException("Error sending chunk with status: " + response.statusCode()));
-                    }).bodyToMono(String.class).map(response -> {
-                        log.info("Successfully sent chunk {} to node {}:{}", chunk.getId(), node.getHostAddr(),
-                                node.getPort());
-                        return true;
-                    }).onErrorResume(e -> {
-                        log.error("Failed to send chunk {} to node {}:{}", chunk.getId(), node.getHostAddr(),
-                                node.getPort(), e);
-                        return Mono.just(false);
-                    }).block(Duration.ofSeconds(30)); // Add appropriate timeout
-
-            return result != null && result;
-        } catch (Exception e) {
-            throw new StorageNodeException("Error sending chunk to node " + node.getHostAddr() + ":" + node.getPort(),
-                    e);
-        }
-    }
-
-    record ChunkDivisionResult(ChunkProperties chunkProperties, byte[] chunkData) {
-    }
-
-    record DistributionResult(StorageNode storageNode, int chunkIndex) {
+            chunkSet.add(result.chunkProperties());
+        });
+        chunkPropertiesRepository.saveAll(chunkSet.stream().toList());
     }
 
 }
