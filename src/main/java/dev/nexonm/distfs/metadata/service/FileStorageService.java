@@ -1,10 +1,8 @@
 package dev.nexonm.distfs.metadata.service;
 
 
-import dev.nexonm.distfs.metadata.config.FileStorageProperties;
 import dev.nexonm.distfs.metadata.dto.FileMapper;
 import dev.nexonm.distfs.metadata.dto.response.ChunkResponse;
-import dev.nexonm.distfs.metadata.dto.response.FileDownloadResponse;
 import dev.nexonm.distfs.metadata.dto.response.FileUploadResponse;
 import dev.nexonm.distfs.metadata.entity.ChunkProperties;
 import dev.nexonm.distfs.metadata.entity.FileProperties;
@@ -15,6 +13,7 @@ import dev.nexonm.distfs.metadata.exception.StorageNodeException;
 import dev.nexonm.distfs.metadata.repository.ChunkPropertiesRepository;
 import dev.nexonm.distfs.metadata.repository.FilePropertiesRepository;
 import dev.nexonm.distfs.metadata.repository.StorageNodeRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatusCode;
@@ -29,9 +28,6 @@ import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,6 +37,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class FileStorageService {
     private final StorageNodeRepository storageNodeRepository;
     private final ChunkPropertiesRepository chunkPropertiesRepository;
@@ -48,30 +45,8 @@ public class FileStorageService {
     private final WebClient webClient;
     private final ChunkSizeCalculator chunkSizeCalculator;
     private final NodeHealthRegistry nodeHealthRegistry;
+    private final ReplicationFactorCalculator replicationFactorCalculator;
 
-    private int replicationFactor;
-
-    public FileStorageService(FileStorageProperties properties, StorageNodeRepository storageNodeRepository,
-                              ChunkPropertiesRepository chunkPropertiesRepository,
-                              FilePropertiesRepository filePropertiesRepository, WebClient webClient,
-                              ChunkSizeCalculator chunkSizeCalculator, NodeHealthRegistry nodeHealthRegistry) {
-        Path fileStorageLocation = Paths.get(properties.getUploadDir()).toAbsolutePath().normalize();
-        this.storageNodeRepository = storageNodeRepository;
-        this.chunkPropertiesRepository = chunkPropertiesRepository;
-        this.filePropertiesRepository = filePropertiesRepository;
-        this.webClient = webClient;
-        this.replicationFactor = 2; // Set default replication factor
-        this.chunkSizeCalculator = chunkSizeCalculator;
-        this.nodeHealthRegistry = nodeHealthRegistry;
-
-        //TODO: delete rhe fileStorageLocation.
-        try {
-            Files.createDirectories(fileStorageLocation);
-        } catch (Exception ex) {
-            throw new FileStorageException("Could not create the directory where the uploaded files will be stored.",
-                    ex);
-        }
-    }
 
     public FileUploadResponse storeFileChunked(MultipartFile file, int chunkSizeBytes) {
         /** The flow of the file storage process is as follows:
@@ -146,7 +121,11 @@ public class FileStorageService {
         // Round Robin implementation
         List<StorageNode> storageNodesList = storageNodeRepository.findAll().stream()
                 .filter(node -> nodeHealthRegistry.isNodeHealthy(node.getId())).toList();
-        // TODO: check if there is only one node available
+        if (storageNodesList.isEmpty()){
+            throw new StorageNodeException("No active nodes. File cannot be transferred.");
+        }
+        // Get replication factor
+        int replicationFactor = replicationFactorCalculator.getOptimalReplicationFactor();
         List<DistributionResult> results = new LinkedList<>();
         int nodeIndex = 0;
         for (int chunkIndex = 0; chunkIndex < chunksNumber; chunkIndex++) {
