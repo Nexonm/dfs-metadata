@@ -48,8 +48,7 @@ public class FileStorageService {
     private final StorageNodeRepository storageNodeRepository;
     private final ChunkPropertiesRepository chunkPropertiesRepository;
     private final FilePropertiesRepository filePropertiesRepository;
-    private final WebClient webClient;
-    private final ChunkSizeCalculator chunkSizeCalculator;
+    private final FileDivisionService fileDivisionService;
     private final NodeHealthRegistry nodeHealthRegistry;
     private final ReplicationFactorCalculator replicationFactorCalculator;
     private final ParallelChunkSender parallelChunkSender;
@@ -74,7 +73,7 @@ public class FileStorageService {
                 .totalSize(file.getSize())
                 .build();
         // 2. Divide into chunks
-        Map<Integer, ChunkDivisionResult> chunks = divideIntoChunks(fileProperties, file);
+        Map<Integer, ChunkDivisionResult> chunks = fileDivisionService.divideIntoChunks(fileProperties, file);
         // Add database persistence for file properties and chunks
         filePropertiesRepository.save(fileProperties);
         chunkPropertiesRepository.saveAll(fileProperties.getChunks());
@@ -86,44 +85,6 @@ public class FileStorageService {
         persistChunksInDB(sendResults);
         // return file data to client
         return FileMapper.mapFiletoFileUploadResponse(file, chunks.size(), fileProperties.getId().toString());
-    }
-
-    private Map<Integer, ChunkDivisionResult> divideIntoChunks(FileProperties fileProperties, MultipartFile file) {
-        Map<Integer, ChunkDivisionResult> results = new HashMap<>();
-
-        int chunkSizeBytes = chunkSizeCalculator.calculateOptimalChunkSize(file.getSize());
-
-        try (InputStream inputStream = file.getInputStream()) {
-            byte[] buffer = new byte[chunkSizeBytes];
-            int bytesRead;
-            int chunkNumber = 1;
-
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                // Read data in as byte array
-                byte[] chunkContent = Arrays.copyOf(buffer, bytesRead);
-                // Create chunk properties
-                ChunkProperties chunkProperty =
-                        ChunkProperties.builder()
-                                .chunkIndex(chunkNumber)
-                                .chunkSize((long) chunkContent.length)
-                                .file(fileProperties)
-                                .id(UUID.randomUUID())
-                                .build();
-                // Add to list
-                results.put(chunkNumber, new ChunkDivisionResult(chunkProperty, chunkContent));
-                // Add chunk to FileProperties
-                fileProperties.addChunk(chunkProperty);
-                // Increase counter
-                chunkNumber++;
-            }
-
-            log.info("Generated {} chunks for {}", results.size(), fileProperties.getFilename());
-            fileProperties.setTotalChunks(chunkNumber - 1);
-            return results;
-
-        } catch (IOException ex) {
-            throw new FileStorageException("Failed to store chunked file", ex);
-        }
     }
 
     private List<DistributionResult> distributeChunksWithReplication(int chunksNumber) {
