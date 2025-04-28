@@ -46,6 +46,9 @@ public class ChunkProperties {
     @Column(name = "chunk_size", nullable = false)
     private Long chunkSize;
 
+    @Column(nullable = false)
+    private String hash;
+
     @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
     @JoinTable(
             name = "chunk_node_mapping",

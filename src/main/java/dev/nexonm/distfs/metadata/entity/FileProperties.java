@@ -43,6 +43,9 @@ public class FileProperties {
     @Column(name = "total_size", nullable = false)
     private Long totalSize;
 
+    @Column(nullable = false)
+    private String hash;
+
     @OneToMany(mappedBy = "file", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<ChunkProperties> chunks = new ArrayList<>();

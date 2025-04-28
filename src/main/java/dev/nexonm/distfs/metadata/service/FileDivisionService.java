@@ -22,6 +22,7 @@ import java.util.UUID;
 public class FileDivisionService {
 
     private final ChunkSizeCalculator chunkSizeCalculator;
+    private final HashGenerationService hashGenerationService;
 
     public Map<Integer, ChunkDivisionResult> divideIntoChunks(FileProperties fileProperties, MultipartFile file) {
         Map<Integer, ChunkDivisionResult> results = new HashMap<>();
@@ -36,13 +37,16 @@ public class FileDivisionService {
             while ((bytesRead = inputStream.read(buffer)) != -1) {
                 // Read data in as byte array
                 byte[] chunkContent = Arrays.copyOf(buffer, bytesRead);
+                //Generate hash
+                String chunkHash = hashGenerationService.generateChunkHash(chunkContent);
                 // Create chunk properties
                 ChunkProperties chunkProperty =
                         ChunkProperties.builder()
+                                .id(UUID.randomUUID())
                                 .chunkIndex(chunkNumber)
                                 .chunkSize((long) chunkContent.length)
+                                .hash(chunkHash)
                                 .file(fileProperties)
-                                .id(UUID.randomUUID())
                                 .build();
                 // Add to list
                 results.put(chunkNumber, new ChunkDivisionResult(chunkProperty, chunkContent));

@@ -18,20 +18,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class FileStoreController {
     private final FileStorageService fileStorageService;
 
-//    @PostMapping("/upload")
-//    public ResponseEntity<FileUploadResponse> uploadFile(@RequestParam("file") MultipartFile file) {
-//        log.info("Received file upload request for file: {}", file.getOriginalFilename());
-//
-//        String fileName = fileStorageService.storeFile(file);
-//
-//        return ResponseEntity.ok(FileMapper.mapFileToFileResponse(file, fileName));
-//    }
 
     @PostMapping("/uploadChunked")
     public ResponseEntity<FileUploadResponse> uploadFileChunked(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(defaultValue = "50") int chunkSize) {
+            @RequestParam(name = "fileHash") String fileHash) {
 
-        return ResponseEntity.ok(fileStorageService.storeFileChunked(file, chunkSize));
+        return ResponseEntity.ok(fileStorageService.storeFileChunked(file, fileHash));
     }
 }
