@@ -16,5 +16,6 @@ public class ChunkAllocationResponse {
     String chunkUUID;
     Integer chunkIndex;
     Integer chunkSizeBytes;
+    String chunkHash;
     List<HostResponse> hosts;
 }

@@ -7,6 +7,7 @@ import dev.nexonm.distfs.metadata.dto.response.HostResponse;
 import dev.nexonm.distfs.metadata.entity.ChunkProperties;
 import dev.nexonm.distfs.metadata.entity.FileProperties;
 import dev.nexonm.distfs.metadata.entity.StorageNode;
+import dev.nexonm.distfs.metadata.exception.FileNotFoundException;
 import dev.nexonm.distfs.metadata.repository.FilePropertiesRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class FileDownloadService {
     public FileDownloadResponse getFileAllocations(FileDownloadRequest request){
         String fileUUID = validateRequest(request);
         FileProperties fileProperties = filePropertiesRepository.findById(UUID.fromString(fileUUID)).orElseThrow(
-                () -> new IllegalArgumentException(String.format("The file with UUID=%s does not exist.", fileUUID))
+                () -> new FileNotFoundException(String.format("The file with UUID=%s does not exist.", fileUUID))
         );
         FileDownloadResponse response = FileDownloadResponse.builder()
                 .fileUUID(fileUUID)
@@ -40,6 +41,7 @@ public class FileDownloadService {
                     .chunkUUID(chunk.getId().toString())
                     .chunkIndex(chunk.getChunkIndex())
                     .chunkSizeBytes(chunk.getChunkSize().intValue())
+                    .chunkHash(chunk.getHash())
                     .hosts(new LinkedList<>())
                     .build();
             for(StorageNode storageNode : chunk.getStorageNodes()){

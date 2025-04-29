@@ -115,6 +115,7 @@ public class ParallelChunkSender {
             bodyBuilder.part("chunkId", chunk.getId().toString());
             bodyBuilder.part("fileId", chunk.getFile().getId().toString());
             bodyBuilder.part("chunkIndex", chunk.getChunkIndex().toString());
+            bodyBuilder.part("hash", chunk.getHash());
 
             return webClient.post()
                     .uri(url)
