@@ -1,39 +1,30 @@
-services:
-  db:
-    image: postgres:15-alpine
-    container_name: dfs_metadata_db
-    env_file:
-      - .env
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT}:5432"
-    networks:
-      - spring_network
+version: '3.8'
 
-  spring_app:
+services:
+  metadata_1:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: dfs_metadata
-    env_file:
-      - .env
+    container_name: dfs_metadata_1
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "${SPRING_APP_PORT}:8080"
-    depends_on:
-      - db
     networks:
-      - spring_network
+      - dfs_network
 
-volumes:
-  postgres_data:
+  metadata_2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dfs_metadata_2
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - dfs_network
+
 networks:
-  spring_network:
+  dfs_network:
+    external: true
