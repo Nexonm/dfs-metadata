@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  metadata_1:
+  metadata:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: dfs_metadata_1
+    container_name: ${CONTAINER_NAME:-default_name}
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
@@ -13,17 +13,6 @@ services:
     networks:
       - dfs_network
 
-  metadata_2:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: dfs_metadata_2
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-    networks:
-      - dfs_network
 
 networks:
   dfs_network:

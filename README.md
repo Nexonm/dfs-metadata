@@ -30,9 +30,9 @@ A scalable Spring Boot metadata server that manages distributed file storage acr
 ```
 [Client] ↔ [Metadata Server] ↔ [PostgreSQL]  
 			   |  
-			   |↔ [Storage Node 1]  
-			   |↔ ...  
-			   |↔ [Storage Node N]
+			   | ↔ [Storage Node 1]  
+			   | ↔ ...  
+			   | ↔ [Storage Node N]
 ```
 
 ### Basic upload example
@@ -50,7 +50,7 @@ A scalable Spring Boot metadata server that manages distributed file storage acr
 - Firstly start the metadata server (this repository):
 ```bash
 git clone https://github.com/Nexonm/dfs-metadata.git
-docker-compose up --build
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 ### Storage node start
@@ -69,7 +69,7 @@ POSTGRES_PORT=5432
 ```
 
 ### Spring Application
-Main parts of the `application.properties`. There defind maximum size of files to be aploaded and chunk division sizes.
+Main parts of the `application.properties`. There are defined maximum size of files to be aploaded in MB and chunk division sizes in bytes.
 ```application.properties
 # File size restrictions  
 spring.servlet.multipart.max-file-size=500MB  
