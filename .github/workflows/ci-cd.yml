@@ -41,7 +41,7 @@ jobs:
       
       - name: Wait for application to start
         run: |
-          sleep 30
+          sleep 20
       
       - name: Test health endpoint
         run: |
