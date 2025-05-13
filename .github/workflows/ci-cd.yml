@@ -52,10 +52,6 @@ jobs:
           docker stop metadata-test
           docker rm metadata-test
       
-      - name: Remove test image
-        run: |
-          docker rmi $(docker images -q '*metadata*:latest') || true
-      
       - name: Clean dangling images after test
         run: |
           docker image prune -f
@@ -70,6 +66,10 @@ jobs:
       - name: Create network if not exists
         run: |
           docker network create dfs_network || true
+
+      - name: Stop and remove existing containers
+        run: |
+          docker rm $(docker stop $(docker ps --filter name=^metadata --format "{{.Names}}"))
       
       - name: Deploy first instance
         run: |
@@ -77,7 +77,7 @@ jobs:
       
       - name: Deploy second instance
         run: |
-          CONTAINER_NAME=metadata-2 docker-compose -p m2 up -d
+          CONTAINER_NAME=metadata-2 docker-compose -p m2 up -d 
       
       - name: Clean dangling images after deployment
         run: |
