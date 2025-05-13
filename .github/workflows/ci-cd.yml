@@ -70,15 +70,14 @@ jobs:
       - name: Stop and remove existing containers
         run: |
           docker rm $(docker stop $(docker ps --filter name=^metadata --format "{{.Names}}"))
-          docker rmi $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^m[0-9]-metadata:')
       
       - name: Deploy first instance
         run: |
-          CONTAINER_NAME=metadata-1 docker-compose -p m1 up -d
+          docker-compose run --name metadata-1 -d metadata
       
       - name: Deploy second instance
         run: |
-          CONTAINER_NAME=metadata-2 docker-compose -p m2 up -d 
+          docker-compose run --name metadata-2 -d metadata 
       
       - name: Clean dangling images after deployment
         run: |
