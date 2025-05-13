@@ -37,7 +37,7 @@ jobs:
 
       - name: Start test container
         run: |
-          CONTAINER_NAME=metadata-test docker-compose up -d
+          docker-compose run --name metadata-test -p 8080:8080 -d metadata
       
       - name: Wait for application to start
         run: |
@@ -72,11 +72,11 @@ jobs:
       
       - name: Deploy first instance
         run: |
-          CONTAINER_NAME=metadata-1 docker compose -p m1 up -d
+          CONTAINER_NAME=metadata-1 docker-compose -p m1 up -d
       
       - name: Deploy second instance
         run: |
-          CONTAINER_NAME=metadata-2 docker compose -p m2 up -d
+          CONTAINER_NAME=metadata-2 docker-compose -p m2 up -d
       
       - name: Clean dangling images after deployment
         run: |
