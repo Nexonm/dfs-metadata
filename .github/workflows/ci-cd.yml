@@ -49,7 +49,8 @@ jobs:
       
       - name: Stop test container
         run: |
-          docker-compose down
+          docker stop metadata-test
+          docker rm metadata-test
       
       - name: Remove test image
         run: |
