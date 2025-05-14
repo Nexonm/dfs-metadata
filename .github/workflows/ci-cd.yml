@@ -69,7 +69,7 @@ jobs:
 
       - name: Stop and remove existing containers
         run: |
-          docker rm $(docker stop $(docker ps --filter name=^metadata --format "{{.Names}}"))
+          docker rm $(docker stop $(docker ps -a --filter name=^metadata --format "{{.Names}}"))
       
       - name: Deploy first instance
         run: |
