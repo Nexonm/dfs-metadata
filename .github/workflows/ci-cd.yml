@@ -35,6 +35,11 @@ jobs:
         run: |
           docker network create dfs_network || true
 
+      - name: Stop and delete test containers if any
+        run: |
+          docker stop metadata-test || true
+          docker rm metadata-test || true
+      
       - name: Start test container
         run: |
           docker-compose run --name metadata-test -p 8080:8080 -d metadata
